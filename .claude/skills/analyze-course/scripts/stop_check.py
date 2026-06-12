@@ -55,16 +55,23 @@ def main() -> int:
 
     background = hook_input.get("background_tasks") or []
     if background:
-        reason = (
-            f"{result['subject']}は未完了で、バックグラウンド処理も実行中です。"
-            f"次工程は {result['next_phase']}。処理を監視して完了後に再検証してください。"
-        )
-    else:
-        reason = (
-            f"{result['subject']}の完成条件が未達です。次工程: {result['next_phase']}。"
-            f"未達チェック: {', '.join(result['failed_checks'])}。"
-            "既存成果物を保ち、未達項目を処理してvalidate_course.pyを再実行してください。"
-        )
+        # バックグラウンド処理は完了通知で必ず再開される。実行中に毎ターンblockすると
+        # 数十秒間隔で空回りし、レート制限・トークン浪費につながる。ここではblockせず
+        # 待機(idle)させ、ジョブ完了の通知で再開させる。
+        emit({
+            "systemMessage": (
+                f"{result['subject']}は未完了ですが、バックグラウンド処理が実行中です。"
+                f"次工程は {result['next_phase']}。ブロックせず待機します"
+                "（ジョブ完了の通知で再開し、再検証します）。"
+            )
+        })
+        return 0
+
+    reason = (
+        f"{result['subject']}の完成条件が未達です。次工程: {result['next_phase']}。"
+        f"未達チェック: {', '.join(result['failed_checks'])}。"
+        "既存成果物を保ち、未達項目を処理してvalidate_course.pyを再実行してください。"
+    )
     emit({"decision": "block", "reason": reason})
     return 0
 
