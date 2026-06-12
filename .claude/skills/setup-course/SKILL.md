@@ -12,9 +12,12 @@ effort: high
 
 # 教科追加
 
-次を実行する。
+引数から教科IDと教科名を確認し、次をBashツールで実行する。引数を推測せず、シェル文字列へ安全に渡すこと。
 
-!`python3 "${CLAUDE_SKILL_DIR}/scripts/register_course.py" "$course_id" "$course_name" --project-root "${CLAUDE_PROJECT_DIR}"`
+```bash
+python3 .claude/skills/setup-course/scripts/register_course.py \
+  "<教科ID>" "<教科名>" --project-root .
+```
 
 ## 完了確認
 

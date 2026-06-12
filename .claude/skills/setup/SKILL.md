@@ -10,7 +10,7 @@ effort: high
 
 ## 現在の状態
 
-!`python3 "${CLAUDE_SKILL_DIR}/scripts/setup_project.py" --project-root "${CLAUDE_PROJECT_DIR}" --check`
+!`python3 .claude/skills/setup/scripts/setup_project.py --project-root . --check`
 
 ## 実行手順
 
@@ -22,7 +22,7 @@ effort: high
 
 ```bash
 python3 .claude/skills/setup/scripts/setup_project.py \
-  --project-root "$CLAUDE_PROJECT_DIR" \
+  --project-root . \
   --apply \
   --install-system \
   --download-model
@@ -34,7 +34,7 @@ python3 .claude/skills/setup/scripts/setup_project.py \
 
 ```bash
 python3 .claude/skills/setup/scripts/setup_project.py \
-  --project-root "$CLAUDE_PROJECT_DIR" \
+  --project-root . \
   --check \
   --strict
 ```

@@ -11,7 +11,7 @@ hooks:
   Stop:
     - hooks:
         - type: command
-          command: "python3 \"${CLAUDE_PROJECT_DIR}/.claude/skills/analyze-course/scripts/stop_check.py\" --project-root \"${CLAUDE_PROJECT_DIR}\""
+          command: "python3 .claude/skills/analyze-course/scripts/stop_check.py --project-root ."
           timeout: 120
 ---
 
@@ -19,7 +19,12 @@ hooks:
 
 ## 実行コンテキスト
 
-!`python3 "${CLAUDE_SKILL_DIR}/scripts/start_run.py" "$course_id" --project-root "${CLAUDE_PROJECT_DIR}" --session-id "${CLAUDE_SESSION_ID}"`
+引数から教科IDを確認し、次をBashツールで実行する。`<教科ID>` は引数の値へ置き換え、推測しない。セッションIDが利用できる場合だけ `--session-id` を追加する。
+
+```bash
+python3 .claude/skills/analyze-course/scripts/start_run.py \
+  "<教科ID>" --project-root .
+```
 
 ## 手順
 
@@ -33,8 +38,8 @@ hooks:
 8. 最後に次を実行し、失敗項目をすべて修正する。
 
 ```bash
-python3 .claude/skills/analyze-course/scripts/validate_course.py "$course_id" \
-  --project-root "$CLAUDE_PROJECT_DIR" --write-report
+python3 .claude/skills/analyze-course/scripts/validate_course.py "<教科ID>" \
+  --project-root . --write-report
 ```
 
 9. 機械検証が成功したら、実施内容、Sonnet・Opusの担当、問題数、カード数、監査修正数、UI確認結果を最終報告する。
