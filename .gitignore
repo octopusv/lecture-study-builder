@@ -9,6 +9,7 @@
 
 # Claude Code local runtime state
 /.claude/course-analysis-runs/
+/.claude/lecture-analysis-runs/
 /.claude/settings.local.json
 
 # Local task and progress files

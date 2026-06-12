@@ -44,6 +44,8 @@
 
 ### 6. assessment
 
+- 回別の問題・カードは `output/assessment/第NN回.json` を唯一の回別保存先とし、`site/data.js` はそこから組み立てる。
+- 既に正常な `output/assessment/第NN回.json` がある回（`/analyze-lectures` で先行生成した回など）はスキップし、欠損・不正な回だけを作問する。
 - 各回を `lecture-assessment-author` Sonnetへ分担する。
 - 4択は各回20〜30問を目安とし、全体件数は講義回数に応じて決める。
 - カードは各回15〜25枚を目安とし、全体件数は講義回数に応じて決め、、特に密度が高い回だけ30枚程度まで許容する。

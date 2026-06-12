@@ -14,6 +14,7 @@
 -  **試験対策** — 講義内容に基づく4択問題と双方向の暗記カード
 -  **学習サイト** — 検索・絞り込み・採点・解説・進捗保存に対応した教科別サイト＋教科一覧ポータル
 -  **再開可能** — 中断しても、未完了の工程だけを自動で検出して続きから再開
+-  **特定回だけ先行分析** — `/analyze-lectures` で指定した講義回だけを先に処理。続けて全体を回すと、済んだ回は自動でスキップ
 
 ---
 
@@ -45,6 +46,18 @@
 
 `/analyze-course` は既存の正常な成果物を再利用し、欠損・未完了の工程から再開します。完了条件を満たすまで Stop フックが自動で作業を継続します（連続継続の上限に達したら同じコマンドを再実行）。
 
+### 特定の回だけ先に分析する
+
+教科全体ではなく、一部の講義回だけを先に仕上げたいときは `/analyze-lectures` を使います。
+
+```text
+/analyze-lectures 01 1-5     # 第1〜5回だけを処理（5 / 1-5 / 1,3,5 / 1-3,8 を指定可）
+```
+
+指定した回の**文字起こし・OCR・回別ノート・4択問題・暗記カード**を、`/analyze-course` と同じ場所（`output/transcripts/`・`output/notes/`・`output/assessment/第NN回.json` など）に生成して止まります。統合まとめ・サイト・最終横断監査は対象外です。
+
+あとで `/analyze-course 01` を実行すると、ここで仕上げた回は**自動的にスキップ**され、残りの回と全体の統合（まとめ・サイト・横断監査）だけが処理されます。`/analyze-lectures` 自身も、未完了の回が揃うまで Stop フックが自動継続します。
+
 ---
 
 ## ディレクトリ構成
@@ -62,7 +75,7 @@
 │   ├── build_detailed_notes.py # 詳細ノート生成
 │   ├── build_assessment_data.py# 問題・カードのサイトデータ化
 │   └── build_site_data.py      # サイトデータ生成
-├── .claude/skills/       # /setup・/setup-course・/analyze-course
+├── .claude/skills/       # /setup・/setup-course・/analyze-course・/analyze-lectures
 ├── portal.css            # ポータル共通スタイル
 ├── index.html            # 教科一覧ポータル（ローカル生成・Git管理外）
 └── 教科別/               # 教科ごとの動画と成果物（Git管理外）
@@ -104,7 +117,7 @@
 - `教科別/`（動画・文字起こし・OCR全文・生成途中の成果物）
 - `config/subjects.json`（ローカル教科台帳）
 - `index.html` / `PROGRESS_*.md` / `GOAL_*.txt`
-- `.venv/` / `node_modules/` / `.claude/course-analysis-runs/`
+- `.venv/` / `node_modules/` / `.claude/course-analysis-runs/` / `.claude/lecture-analysis-runs/`
 
 公開テンプレートには空の `config/subjects.example.json` のみを含めます。
 
