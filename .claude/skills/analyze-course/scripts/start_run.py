@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,8 +15,15 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("course_id")
     parser.add_argument("--project-root", type=Path, required=True)
-    parser.add_argument("--session-id", required=True)
+    parser.add_argument("--session-id", default=os.environ.get("CLAUDE_CODE_SESSION_ID"))
     args = parser.parse_args()
+
+    if not args.session_id:
+        print(json.dumps(
+            {"error": "セッションIDがありません。--session-id か環境変数 CLAUDE_CODE_SESSION_ID を指定してください"},
+            ensure_ascii=False,
+        ))
+        return 2
 
     project_root = args.project_root.resolve()
     try:

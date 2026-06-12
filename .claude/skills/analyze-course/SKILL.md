@@ -5,7 +5,6 @@ argument-hint: "<教科ID>"
 arguments:
   - course_id
 disable-model-invocation: true
-model: sonnet
 effort: high
 hooks:
   Stop:
@@ -19,11 +18,11 @@ hooks:
 
 ## 実行コンテキスト
 
-引数から教科IDを確認し、次をBashツールで実行する。`<教科ID>` は引数の値へ置き換え、推測しない。セッションIDが利用できる場合だけ `--session-id` を追加する。
+引数から教科IDを確認し、次をBashツールで実行する。`<教科ID>` は引数の値へ置き換え、推測しない。`--session-id` には環境変数 `$CLAUDE_CODE_SESSION_ID` を必ず渡す。これでStopフックの自動継続が有効になる（状態ファイルがこのIDで作成され、Stopフックが同じIDで照合するため）。スクリプト側も同環境変数を既定値にするため省略してもよいが、明示を推奨する。
 
 ```bash
 python3 .claude/skills/analyze-course/scripts/start_run.py \
-  "<教科ID>" --project-root .
+  "<教科ID>" --project-root . --session-id "$CLAUDE_CODE_SESSION_ID"
 ```
 
 ## 手順

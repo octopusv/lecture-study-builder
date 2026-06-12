@@ -7,6 +7,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -239,6 +240,53 @@ def apply_setup(project_root: Path, install_system: bool, download_model: bool) 
         ensure_model(project_root)
 
 
+def summarize(state: dict[str, Any], applied: bool) -> None:
+    """JSONとは別に、人間向けの完了サマリをstderrへ出力する。"""
+    bar = "─" * 52
+    lines = [bar]
+    head = "✅ セットアップ完了: 準備OK" if state["ready"] else "⚠️  セットアップ未完了"
+    mode = "（適用後の状態）" if applied else "（チェック結果）"
+    lines.append(f"{head} {mode}  ready={str(state['ready']).lower()}")
+
+    plat = state["platform"]
+    lines.append(
+        f"  プラットフォーム : {plat['system']}/{plat['machine']} "
+        + ("対応" if state["supported_platform"] else "非対応")
+    )
+
+    missing_cmds = [name for name, ok in state["commands"].items() if not ok]
+    lines.append("  コマンド         : " + ("全導入済み" if not missing_cmds else "未導入 " + ", ".join(missing_cmds)))
+
+    missing_pkgs = [name for name, ok in state["python_packages"].items() if not ok]
+    if not state["venv_exists"]:
+        py_status = ".venv なし"
+    elif missing_pkgs:
+        py_status = ".venv あり / 不足 " + ", ".join(missing_pkgs)
+    else:
+        py_status = ".venv あり / 必須パッケージ充足"
+    lines.append("  Python環境       : " + py_status)
+
+    lines.append("  Whisperモデル    : " + ("キャッシュ済み" if state["whisper_model"]["cached"] else "未取得"))
+    lines.append("  ポータル         : index.html " + ("存在" if state["portal_index"]["exists"] else "なし"))
+
+    reg = state["subject_registry"]
+    lines.append(f"  教科台帳         : {reg['count']}教科登録" + ("" if reg["valid"] else " (台帳エラー)"))
+
+    courses = state["courses"]
+    total_missing = sum(len(c["missing_directories"]) for c in courses.values())
+    with_missing = [cid for cid, c in courses.items() if c["missing_directories"]]
+    folder_line = f"  作業フォルダ     : 不足 {total_missing} 件"
+    if with_missing:
+        folder_line += " (教科 " + ", ".join(with_missing) + ")"
+    lines.append(folder_line)
+
+    if not state["ready"]:
+        lines.append("  → 次のアクション : --apply --install-system --download-model を実行")
+
+    lines.append(bar)
+    print("\n".join(lines), file=sys.stderr, flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-root", type=Path, required=True)
@@ -255,9 +303,11 @@ def main() -> int:
             apply_setup(root, args.install_system, args.download_model)
         except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
             print(json.dumps({"ready": False, "error": str(exc)}, ensure_ascii=False, indent=2))
+            print(f"⚠️  セットアップ適用中にエラー: {exc}", file=sys.stderr, flush=True)
             return 2
     state = inspect(root)
     print(json.dumps(state, ensure_ascii=False, indent=2))
+    summarize(state, applied=args.apply)
     return 1 if args.strict and not state["ready"] else 0
 
 

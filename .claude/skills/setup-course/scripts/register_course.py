@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +67,26 @@ def ensure_directories(base: Path) -> list[str]:
     return created
 
 
+def summarize(course_id: str, entry: dict[str, Any], created: list[str]) -> None:
+    """JSONとは別に、人間向けの登録サマリをstderrへ出力する。"""
+    bar = "─" * 52
+    lectures = entry.get("lecture_count", "?")
+    parts = entry.get("parts_per_lecture", "?")
+    expected = entry.get("expected_videos", "?")
+    directory = entry.get("directory", "")
+    lines = [
+        bar,
+        f"✅ 教科登録完了: {course_id} {entry.get('name', '')}",
+        f"  ディレクトリ : {directory}",
+        f"  動画構成     : {lectures}回 × {parts}本 = {expected}本想定",
+        "  作成フォルダ : " + (f"{len(created)}件" if created else "なし（既存を再利用）"),
+        f"  次のコマンド : /analyze-course {course_id}",
+        bar,
+        f"  ※ 動画は {directory}/videos/ に 1_1.mp4 〜 {lectures}_{parts}.mp4 を配置してください",
+    ]
+    print("\n".join(lines), file=sys.stderr, flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("course_id")
@@ -100,6 +121,7 @@ def main() -> int:
         created = ensure_directories(project_root / entry["directory"])
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(json.dumps({"created": False, "error": str(exc)}, ensure_ascii=False, indent=2))
+        print(f"⚠️  教科登録に失敗: {exc}", file=sys.stderr, flush=True)
         return 2
 
     print(json.dumps({
@@ -108,6 +130,7 @@ def main() -> int:
         "created_directories": created,
         "next_command": f"/analyze-course {course_id}",
     }, ensure_ascii=False, indent=2))
+    summarize(course_id, entry, created)
     return 0
 
 

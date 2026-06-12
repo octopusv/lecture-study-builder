@@ -6,7 +6,6 @@ arguments:
   - course_id
   - course_name
 disable-model-invocation: true
-model: sonnet
 effort: high
 ---
 
