@@ -1,0 +1,45 @@
+# Local course data and generated materials
+/教科別/
+/config/subjects.json
+/index.html
+
+# Local environments and installed dependencies
+/.venv/
+/node_modules/
+
+# Claude Code local runtime state
+/.claude/course-analysis-runs/
+/.claude/settings.local.json
+
+# Local task and progress files
+/GOAL_*.txt
+/PROGRESS_*.md
+/CLAUDE_DEPLOY_GOAL.md
+
+# Python caches and tooling
+__pycache__/
+*.py[cod]
+/.pytest_cache/
+/.mypy_cache/
+/.ruff_cache/
+/.coverage
+/htmlcov/
+
+# Logs, temporary files, and backups
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# Node package-manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# macOS and editor metadata
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/

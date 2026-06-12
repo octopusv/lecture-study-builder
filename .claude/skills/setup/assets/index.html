@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="大学の授業動画から文字起こし、OCR、詳細ノート、4択問題、暗記カードを生成する汎用学習ポータル">
+  <title>大学授業 自動まとめポータル</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__inner">
+      <p class="eyebrow">UNIVERSITY LECTURE STUDY HUB</p>
+      <h1>授業動画を、<br><span>学べる教材へ。</span></h1>
+      <p class="hero__lead">
+        文字起こしとスライドOCRを基に、詳しい授業まとめ、4択問題、暗記カード、
+        教科別の学習サイトまで一貫して生成するための汎用ワークスペースです。
+      </p>
+      <div class="hero__stats" aria-label="主な機能">
+        <div><strong>音声認識</strong><span>Whisperによる文字起こし</span></div>
+        <div><strong>OCR</strong><span>スライド内容の抽出</span></div>
+        <div><strong>試験対策</strong><span>4択問題・暗記カード</span></div>
+        <div><strong>LOCAL</strong><span>元動画は手元で管理</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div>
+        <p class="section-label">GETTING STARTED</p>
+        <h2>教科を追加する</h2>
+      </div>
+      <p>
+        初回セットアップ後、任意の教科名で作業フォルダを作成できます。
+        教科の解析が完了すると、このページが教科一覧ポータルとして更新されます。
+      </p>
+    </section>
+
+    <section class="subject-grid" aria-label="利用開始までの手順">
+      <article class="subject-card">
+        <div class="subject-card__top">
+          <span class="subject-number">01</span>
+          <span class="status">環境構築</span>
+        </div>
+        <p class="subject-label">SETUP</p>
+        <h3>必要な環境を準備</h3>
+        <p class="subject-description">
+          Claude CodeでセットアップSkillを実行し、ffmpeg、Python環境、
+          音声認識モデル、OCR依存関係を確認・準備します。
+        </p>
+        <p class="command"><code>/setup</code></p>
+        <span class="subject-action">再実行可能な初期セットアップ</span>
+      </article>
+
+      <article class="subject-card">
+        <div class="subject-card__top">
+          <span class="subject-number">02</span>
+          <span class="status">教科登録</span>
+        </div>
+        <p class="subject-label">ADD A COURSE</p>
+        <h3>任意の教科を追加</h3>
+        <p class="subject-description">
+          教科IDと教科名を指定すると、動画、生成物、学習サイト用の
+          ディレクトリとローカル教科台帳が作成されます。
+        </p>
+        <p class="command"><code>/setup-course 01 教科名</code></p>
+        <span class="subject-action">教科数に固定上限はありません</span>
+      </article>
+
+      <article class="subject-card">
+        <div class="subject-card__top">
+          <span class="subject-number">03</span>
+          <span class="status">動画配置</span>
+        </div>
+        <p class="subject-label">LECTURE VIDEOS</p>
+        <h3>授業動画を配置</h3>
+        <p class="subject-description">
+          作成された教科フォルダの <code>videos/</code> に授業動画を入れます。
+          動画や文字起こしなどの私的データはGitの管理対象外です。
+        </p>
+        <p class="command"><code>教科別/01_教科名/videos/</code></p>
+        <span class="subject-action">元動画は公開しません</span>
+      </article>
+
+      <article class="subject-card subject-card--ready">
+        <div class="subject-card__top">
+          <span class="subject-number">04</span>
+          <span class="status status--ready">解析開始</span>
+        </div>
+        <p class="subject-label">ANALYZE</p>
+        <h3>教材を自動生成</h3>
+        <p class="subject-description">
+          文字起こし、OCR、回別ノート、全体まとめ、問題、暗記カード、
+          レスポンシブな教科サイトを段階的に生成・検証します。
+        </p>
+        <p class="command"><code>/analyze-course 01</code></p>
+        <span class="subject-action">未完了の工程から安全に再開</span>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <p>AI生成内容には誤りが含まれる場合があります。数式・数値・固有名詞は元の授業資料と照合してください。</p>
+  </footer>
+</body>
+</html>
