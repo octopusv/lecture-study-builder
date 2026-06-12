@@ -37,6 +37,15 @@
       </p>
     </section>
 
+    <!--
+      教科一覧ポータルの本体。教科が未完成の初期状態では、下の使い方の手順カード（status が
+      環境構築→教科登録→動画配置→解析開始 の4枚）を並べた空状態とする。これらはプレースホルダである。
+      教科サイトが完成したら、この section 内の手順カードを教科カードへ置き換える。
+      教科カード1枚 = <article class="subject-card subject-card--ready">。subject-number に教科ID、
+      status--ready で「利用可能」、h3 に教科名、問題数・暗記カード数・動画数を表示し、その教科の
+      site/index.html へリンクする。2教科目以降は他カードを壊さずカードを追加する。
+      詳しい更新手順は CLAUDE.md「ポータル更新」を参照。
+    -->
     <section class="subject-grid" aria-label="利用開始までの手順">
       <article class="subject-card">
         <div class="subject-card__top">

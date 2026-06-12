@@ -32,7 +32,7 @@ python3 .claude/skills/setup/scripts/setup_project.py \
 ```
 
 7. セットアップ中に失敗した工程だけを修正・再実行する。正常な環境やモデルは再作成しない。
-8. ルートの `index.html` が存在しなかった場合だけ、`assets/index.html` から公開タイトル「大学授業 自動まとめポータル」の汎用初期ページが生成される。既存の `index.html` は個人用ホームを含めて絶対に上書きしない。
+8. ルートの `index.html` が存在しなかった場合だけ、`assets/index.html` から公開タイトル「大学授業 自動まとめポータル」の汎用初期ページが生成される（`index.html` はGit管理外のローカル生成物で、clone直後には存在しない）。この初期ページは解析手順を案内する空状態で、教科完成後に `/analyze-course` のポータル更新が教科カードへ作り変える（`CLAUDE.md`「ポータル更新」参照）。既存の `index.html` は個人用ホームを含めて絶対に上書きしない。
 9. 最後に次をBashツールで実行し、`portal_index.exists: true` と `ready: true` を確認する。
 
 ```bash
