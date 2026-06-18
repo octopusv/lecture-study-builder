@@ -20,15 +20,22 @@
 
 ## 動作環境
 
-| 項目 | 要件 |
-|------|------|
-| プラットフォーム | Apple Silicon 搭載 Mac |
-| 実行環境 | Claude Code |
-| Claudeプラン | **Claude Max プラン以上が必須** |
-| パッケージ管理 | Homebrew（`ffmpeg` / `uv` / `node`） |
-| Python | `uv` が管理する仮想環境（`.venv`） |
+**Apple Silicon 搭載 Mac を標準**としつつ、**Windows 10/11 にも対応**します。音声認識とスライドOCRだけ OS ごとに実装が異なり（下表）、それ以外の工程・成果物・サイトは共通です。
 
-> `/setup` が不足分のみを導入・検証します（Homebrew 本体だけは安全のため自動導入せず、未導入時は公式インストーラーを案内します）。
+| 項目 | macOS（標準） | Windows |
+|------|--------------|---------|
+| プラットフォーム | Apple Silicon 搭載 Mac | Windows 10 / 11 |
+| 実行環境 | Claude Code | Claude Code |
+| Claudeプラン | **Claude Max プラン以上が必須** | **Claude Max プラン以上が必須** |
+| パッケージ管理 | Homebrew（`ffmpeg` / `uv` / `node`） | winget（`ffmpeg` / `uv` / `node`） |
+| 音声認識 | `mlx_whisper`（`large-v3-turbo`） | `faster-whisper`（CT2 版 `large-v3-turbo`） |
+| スライドOCR | macOS 標準の Apple Vision | RapidOCR（完全ローカル） |
+| 初回セットアップ | `/setup` | `/setup-windows` |
+| Python | `uv` が管理する仮想環境（`.venv`） | `uv` が管理する仮想環境（`.venv`） |
+
+> Windows 版の代替（`faster-whisper` / RapidOCR）も、Mac 標準構成と同じく**完全ローカル処理・追加課金なし・外部送信なし**です。
+
+> `/setup`（Mac）・`/setup-windows`（Windows）が不足分のみを導入・検証します。Homebrew / winget 本体だけは安全のため自動導入せず、未導入時は公式の入手方法を案内します。
 
 > 1教科の解析で、多数の Sonnet / Opus サブエージェントを長時間動かし、文字起こし・OCR・作問・監査・サイト生成まで大量のトークンを消費します。安定して完走させるため **Claude Max プラン以上**を前提とします。
 
@@ -36,10 +43,25 @@
 
 ## クイックスタート
 
+### macOS（Apple Silicon）
+
 ```text
 /setup                     # 環境構築・検証（ffmpeg, uv, node, .venv, Whisperモデル）
 /setup-course 01 教科名     # 教科を登録し、作業フォルダを作成
 ```
+
+### Windows（10 / 11）
+
+```text
+/setup-windows             # 環境構築・検証（winget で ffmpeg/uv/node、.venv、CT2 モデル）
+/setup-course 01 教科名     # 教科を登録し、作業フォルダを作成
+```
+
+`/setup-windows` は winget で不足コマンドを導入し、`faster-whisper`（音声認識）と RapidOCR（スライドOCR）をローカルに準備します。あわせて、各 Skill の Stop フックが呼ぶ `python3` を `python` へ転送するエイリアスを作成し、ユーザー PATH に追加します（winget 導入・モデル取得・PATH 変更はいずれも実行前に許可を求めます）。**PATH 変更を反映するため、セットアップ後は新しいターミナルを開いてから解析を始めてください。**
+
+> Mac と Windows で `/setup-course`・`/analyze-course`・`/analyze-lectures` の使い方は共通です。OS によって自動的に対応する音声認識・OCR スクリプトが選ばれます。
+
+### 動画を配置して解析
 
 作成された `教科別/01_教科名/videos/` に授業動画（既定は `1_1.mp4`〜`15_6.mp4`）を配置し、解析を開始します。
 
@@ -72,13 +94,15 @@
 │   ├── subjects.example.json   # 公開テンプレート用の空台帳
 │   └── subjects.json           # ローカル教科台帳（Git管理外）
 ├── scripts/              # 共通処理（教科に依存しない汎用スクリプト）
-│   ├── transcribe_macro.py     # 音声認識
-│   ├── extract_frames.py       # フレーム抽出
-│   ├── ocr_slides.py           # Apple Vision OCR
+│   ├── transcribe_macro.py     # 音声認識（macOS / mlx_whisper）
+│   ├── transcribe_windows.py   # 音声認識（Windows / faster-whisper）
+│   ├── extract_frames.py       # フレーム抽出（共通・ffmpeg）
+│   ├── ocr_slides.py           # スライドOCR（macOS / Apple Vision）
+│   ├── ocr_slides_windows.py   # スライドOCR（Windows / RapidOCR）
 │   ├── build_detailed_notes.py # 詳細ノート生成
 │   ├── build_assessment_data.py# 問題・カードのサイトデータ化
 │   └── build_site_data.py      # サイトデータ生成
-├── .claude/skills/       # /setup・/setup-course・/analyze-course・/analyze-lectures
+├── .claude/skills/       # /setup・/setup-windows・/setup-course・/analyze-course・/analyze-lectures
 ├── portal.css            # ポータル共通スタイル
 ├── index.html            # 教科一覧ポータル（ローカル生成・Git管理外）
 └── 教科別/               # 教科ごとの動画と成果物（Git管理外）
