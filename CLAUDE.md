@@ -66,6 +66,8 @@
 これらは既存教科の処理に使用する共通基盤である。教科名、入力動画ディレクトリ、出力先、Whisperの初期プロンプトを引数で受け取り、任意の教科に安全に適用できる状態を維持する。
 同じ機能を持つ別スクリプトを不必要に重複作成しないこと。
 
+音声認識・OCRはApple Silicon Macを標準とする（Apple Vision＋mlx_whisper）。**Windows環境でのみ**、ローカル代替として `scripts/transcribe_windows.py`（faster-whisper）と `scripts/ocr_slides_windows.py`（RapidOCR、いずれもローカル処理・追加課金なし・外部送信なし）を使う。フレーム抽出は共通の `scripts/extract_frames.py` を両OSで使う。Windows代替2スクリプトはOSガードを持ち対象外OSでは実行しない。初回環境構築は `/setup-windows` で行う。以降の「音声認識」「スライドOCR」節はMac標準構成の記述であり、Windowsでは上記代替に読み替える。
+
 ## 音声認識
 
 - 既存 `.venv` と `mlx_whisper` を優先して再利用する。
