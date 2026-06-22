@@ -158,8 +158,9 @@ def resolve_device(device: str, compute_type: str) -> tuple[str, str]:
             device = "cpu"
             print(
                 "GPU検出: AMD Radeon。faster-whisper(CTranslate2)はAMD GPUへ非対応のため"
-                "CPUで実行します。AMDでのGPU高速化が必要なら whisper.cpp(Vulkan) 版の導入を"
-                "検討してください。",
+                "CPUで実行します。AMDでGPU高速化したい場合は DirectML版 "
+                "scripts/transcribe_windows_directml.py を使ってください"
+                "（依存: requirements-windows-directml.txt）。",
                 flush=True,
             )
         else:

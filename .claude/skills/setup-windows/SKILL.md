@@ -51,7 +51,8 @@ python3 .claude/skills/setup-windows/scripts/setup_project_windows.py --project-
 - 文字起こしは `scripts/transcribe_macro.py` ではなく **`scripts/transcribe_windows.py`**（faster-whisper）を使う。
 - スライドOCRは `scripts/ocr_slides.py` ではなく **`scripts/ocr_slides_windows.py`**（RapidOCR）を使う。フレーム抽出は共通の `scripts/extract_frames.py`（ffmpeg）をそのまま使う。
 - 上記2スクリプトはOSガードを持ち、Windows以外では即停止する。
-- GPU高速化: `transcribe_windows.py` は `--device auto` で搭載GPUを自動判定し、NVIDIA+CUDAがあればGPU(cuda/float16)、無ければCPUで実行する。faster-whisper(CTranslate2)はAMD GPU非対応のためAMD機はCPU動作になる。`--apply` 時、**NVIDIA GPUを検出した場合だけ** `requirements-windows-cuda.txt`（cuBLAS/cuDNN）を `.venv` へ自動導入する（AMD/CPUのみの環境では導入しない）。導入済みなら再実行時はスキップ。
+- GPU高速化(NVIDIA): `transcribe_windows.py` は `--device auto` で搭載GPUを自動判定し、NVIDIA+CUDAがあればGPU(cuda/float16)、無ければCPUで実行する。`--apply` 時、**NVIDIA GPUを検出した場合だけ** `requirements-windows-cuda.txt`（cuBLAS/cuDNN）を `.venv` へ自動導入する。導入済みなら再実行時はスキップ。
+- GPU高速化(AMD): faster-whisper(CTranslate2)はAMD GPU非対応。AMD機は **DirectML版 `scripts/transcribe_windows_directml.py`**（onnxruntime-directml + optimum + transformers）でGPU動作する。`--apply` 時、**AMD GPUを検出かつNVIDIA非搭載の場合だけ** `requirements-windows-directml.txt` を `.venv` へ自動導入する（NVIDIA機はCUDAを優先、CPUのみの環境では導入しない）。初回実行時に `openai/whisper-large-v3-turbo` をONNXへ自動エクスポートしてキャッシュする。動作確認は `python scripts/transcribe_windows_directml.py --selftest` でprovider(DmlExecutionProvider)を確認できる。
 - `/analyze-course` `/analyze-lectures` のStopフックは `python3` を叩くため、手順6で作る `python3` エイリアスが必要。エイリアス作成後は新しいシェルで有効になる。
 - 音声認識モデルは既定で `deepdml/faster-whisper-large-v3-turbo-ct2`。別のCT2モデルを使う場合は `transcribe_windows.py` と `setup_project_windows.py` の `MODEL_REPO` を合わせて変更する。
 

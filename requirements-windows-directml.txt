@@ -1,0 +1,15 @@
+# Windows + DirectML(AMD/Intel等のDX12 GPU) で文字起こしする場合の依存。
+# scripts/transcribe_windows_directml.py 用。faster-whisper はAMD GPUを使えないため、
+# AMD等でGPU高速化したいときに使う。NVIDIA機は requirements-windows-cuda.txt の方が速い。
+#
+# 導入（.venv へ）:
+#   .venv\Scripts\python -m pip install -r requirements-windows-directml.txt
+#
+# onnxruntime-directml は DmlExecutionProvider(GPU) と CPUExecutionProvider(フォールバック)
+# の両方を含む。標準の onnxruntime とは同居させない（competing providerを避ける）。
+onnxruntime-directml>=1.19
+optimum>=1.22
+transformers>=4.45
+torch>=2.2
+accelerate>=0.30
+onnx>=1.16

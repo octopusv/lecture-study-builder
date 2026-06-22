@@ -48,6 +48,9 @@ REQUIREMENTS_NAME = "requirements-windows.txt"
 # NVIDIA検出時だけ追加導入するCUDAランタイム（AMD/CPUのみの環境では入れない）。
 CUDA_REQUIREMENTS_NAME = "requirements-windows-cuda.txt"
 CUDA_RUNTIME_PACKAGES = ("nvidia.cublas", "nvidia.cudnn")
+# AMD GPU(かつNVIDIA非搭載)検出時だけ導入するDirectMLスタック。
+DIRECTML_REQUIREMENTS_NAME = "requirements-windows-directml.txt"
+DIRECTML_RUNTIME_PACKAGES = ("onnxruntime", "optimum", "transformers")
 # 既存 setup skill の汎用初期ページテンプレートをそのまま流用する（無改造）。
 PORTAL_TEMPLATE = (
     Path(__file__).resolve().parents[2] / "setup" / "assets" / "index.html"
@@ -153,11 +156,42 @@ def nvidia_gpu_present(python: Path) -> bool:
 
 def cuda_runtime_installed(python: Path) -> bool:
     """cuBLAS/cuDNN(pip版)がvenvに入っているか。"""
+    return packages_present(python, CUDA_RUNTIME_PACKAGES)
+
+
+def amd_gpu_present() -> bool:
+    """Windowsの表示アダプタ名にAMD/Radeonが含まれるか（DirectML高速化の対象判定）。"""
+    if platform.system() != "Windows":
+        return False
+    try:
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "(Get-CimInstance Win32_VideoController).Name",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    names = (result.stdout or "").upper()
+    return "AMD" in names or "RADEON" in names
+
+
+def directml_runtime_installed(python: Path) -> bool:
+    """DirectMLスタック(onnxruntime-directml/optimum/transformers)がvenvに入っているか。"""
+    return packages_present(python, DIRECTML_RUNTIME_PACKAGES)
+
+
+def packages_present(python: Path, modules: tuple[str, ...]) -> bool:
     if not python.is_file():
         return False
     code = (
         "import importlib.util,json;"
-        f"mods={CUDA_RUNTIME_PACKAGES!r};"
+        f"mods={modules!r};"
         "print(json.dumps(all(importlib.util.find_spec(m) is not None for m in mods)))"
     )
     completed = subprocess.run([str(python), "-c", code], capture_output=True, text=True)
@@ -177,6 +211,8 @@ def inspect(project_root: Path) -> dict[str, Any]:
     packages = python_packages(python)
     gpu_nvidia = nvidia_gpu_present(python)
     cuda_runtime_ok = cuda_runtime_installed(python)
+    gpu_amd = amd_gpu_present()
+    directml_runtime_ok = directml_runtime_installed(python)
     registry_path = project_root / "config" / "subjects.json"
     portal_path = project_root / "index.html"
     requirements_ok = (project_root / REQUIREMENTS_NAME).is_file()
@@ -229,6 +265,8 @@ def inspect(project_root: Path) -> dict[str, Any]:
         "gpu": {
             "nvidia_detected": gpu_nvidia,
             "cuda_runtime_installed": cuda_runtime_ok,
+            "amd_detected": gpu_amd,
+            "directml_runtime_installed": directml_runtime_ok,
         },
         "requirements_file": requirements_ok,
         "whisper_model": {
@@ -338,6 +376,32 @@ def ensure_cuda_runtime(project_root: Path) -> None:
     run([uv, "pip", "install", "--python", str(python), "-r", str(requirements)], cwd=project_root)
 
 
+def ensure_directml_runtime(project_root: Path) -> None:
+    """AMD GPU(かつNVIDIA非搭載)検出時のみ、DirectMLスタックを.venvへ自動導入する。
+
+    NVIDIA機ではCUDA(faster-whisper)の方が速いのでDirectMLは入れない。CPUのみの環境でも
+    入れない。導入済みなら再実行時はスキップする。これにより transcribe_windows_directml.py
+    がAMD GPU(DirectML)で動くようになる。
+    """
+    requirements = project_root / DIRECTML_REQUIREMENTS_NAME
+    if not requirements.is_file():
+        return
+    python = venv_python(project_root)
+    if nvidia_gpu_present(python) or not amd_gpu_present():
+        return
+    if directml_runtime_installed(python):
+        return
+    uv = shutil.which("uv")
+    if not uv:
+        raise RuntimeError("uvがありません")
+    print(
+        "AMD GPUを検出(NVIDIAなし): DirectMLスタック(onnxruntime-directml/optimum/transformers)"
+        "を導入します。",
+        flush=True,
+    )
+    run([uv, "pip", "install", "--python", str(python), "-r", str(requirements)], cwd=project_root)
+
+
 def ensure_node_environment(project_root: Path) -> None:
     if not (project_root / "package-lock.json").is_file():
         return
@@ -372,6 +436,7 @@ def apply_setup(project_root: Path, install_system: bool, download_model: bool) 
         ensure_system_dependencies()
     ensure_python_environment(project_root)
     ensure_cuda_runtime(project_root)
+    ensure_directml_runtime(project_root)
     ensure_node_environment(project_root)
     if install_system:
         ensure_python3_shim()
@@ -407,10 +472,18 @@ def summarize(state: dict[str, Any], applied: bool) -> None:
     gpu = state["gpu"]
     if gpu["nvidia_detected"]:
         gpu_status = "NVIDIA検出 / CUDAランタイム " + (
-            "導入済み(GPU高速化有効)" if gpu["cuda_runtime_installed"] else "未導入(--apply で自動導入)"
+            "導入済み(faster-whisperがGPU動作)"
+            if gpu["cuda_runtime_installed"]
+            else "未導入(--apply で自動導入)"
+        )
+    elif gpu.get("amd_detected"):
+        gpu_status = "AMD検出 / DirectMLスタック " + (
+            "導入済み(transcribe_windows_directml.pyでGPU動作)"
+            if gpu.get("directml_runtime_installed")
+            else "未導入(--apply で自動導入)"
         )
     else:
-        gpu_status = "NVIDIA未検出 (CPU動作。AMD GPUはfaster-whisper非対応)"
+        gpu_status = "GPU未検出 (CPU動作)"
     lines.append("  GPU              : " + gpu_status)
 
     lines.append("  音声認識モデル   : " + ("キャッシュ済み" if state["whisper_model"]["cached"] else "未取得"))
