@@ -45,6 +45,9 @@ COURSE_DIRECTORIES = (
 )
 MODEL_REPO = "deepdml/faster-whisper-large-v3-turbo-ct2"
 REQUIREMENTS_NAME = "requirements-windows.txt"
+# NVIDIA検出時だけ追加導入するCUDAランタイム（AMD/CPUのみの環境では入れない）。
+CUDA_REQUIREMENTS_NAME = "requirements-windows-cuda.txt"
+CUDA_RUNTIME_PACKAGES = ("nvidia.cublas", "nvidia.cudnn")
 # 既存 setup skill の汎用初期ページテンプレートをそのまま流用する（無改造）。
 PORTAL_TEMPLATE = (
     Path(__file__).resolve().parents[2] / "setup" / "assets" / "index.html"
@@ -128,6 +131,42 @@ def python_packages(python: Path) -> dict[str, bool]:
         return {name: False for name in REQUIRED_PYTHON_PACKAGES}
 
 
+def nvidia_gpu_present(python: Path) -> bool:
+    """venvのctranslate2経由でNVIDIA GPU(CUDAドライバ)の有無を見る。"""
+    if not python.is_file():
+        return False
+    code = (
+        "import json\n"
+        "try:\n"
+        "    import ctranslate2\n"
+        "    n = ctranslate2.get_cuda_device_count()\n"
+        "except Exception:\n"
+        "    n = 0\n"
+        "print(json.dumps(n))"
+    )
+    completed = subprocess.run([str(python), "-c", code], capture_output=True, text=True)
+    try:
+        return completed.returncode == 0 and int(json.loads(completed.stdout)) > 0
+    except (ValueError, json.JSONDecodeError):
+        return False
+
+
+def cuda_runtime_installed(python: Path) -> bool:
+    """cuBLAS/cuDNN(pip版)がvenvに入っているか。"""
+    if not python.is_file():
+        return False
+    code = (
+        "import importlib.util,json;"
+        f"mods={CUDA_RUNTIME_PACKAGES!r};"
+        "print(json.dumps(all(importlib.util.find_spec(m) is not None for m in mods)))"
+    )
+    completed = subprocess.run([str(python), "-c", code], capture_output=True, text=True)
+    try:
+        return completed.returncode == 0 and json.loads(completed.stdout) is True
+    except json.JSONDecodeError:
+        return False
+
+
 def inspect(project_root: Path) -> dict[str, Any]:
     supported = platform.system() == "Windows"
     commands = {
@@ -136,6 +175,8 @@ def inspect(project_root: Path) -> dict[str, Any]:
     }
     python = venv_python(project_root)
     packages = python_packages(python)
+    gpu_nvidia = nvidia_gpu_present(python)
+    cuda_runtime_ok = cuda_runtime_installed(python)
     registry_path = project_root / "config" / "subjects.json"
     portal_path = project_root / "index.html"
     requirements_ok = (project_root / REQUIREMENTS_NAME).is_file()
@@ -185,6 +226,10 @@ def inspect(project_root: Path) -> dict[str, Any]:
         "commands": commands,
         "venv_exists": python.is_file(),
         "python_packages": packages,
+        "gpu": {
+            "nvidia_detected": gpu_nvidia,
+            "cuda_runtime_installed": cuda_runtime_ok,
+        },
         "requirements_file": requirements_ok,
         "whisper_model": {
             "repo": MODEL_REPO,
@@ -272,6 +317,27 @@ def ensure_python_environment(project_root: Path) -> None:
     run([uv, "pip", "install", "--python", str(python), "-r", str(requirements)], cwd=project_root)
 
 
+def ensure_cuda_runtime(project_root: Path) -> None:
+    """NVIDIA GPU検出時のみ、CUDAランタイム(cuBLAS/cuDNN)を.venvへ自動導入する。
+
+    AMD/CPUのみの環境では何もしない（不要な大容量DLLを入れない）。導入済みなら再実行
+    時はスキップする。これにより faster-whisper がGPU(CUDA)で動くようになる。
+    """
+    requirements = project_root / CUDA_REQUIREMENTS_NAME
+    if not requirements.is_file():
+        return
+    python = venv_python(project_root)
+    if not nvidia_gpu_present(python):
+        return
+    if cuda_runtime_installed(python):
+        return
+    uv = shutil.which("uv")
+    if not uv:
+        raise RuntimeError("uvがありません")
+    print("NVIDIA GPUを検出: CUDAランタイム(cuBLAS/cuDNN)を導入します。", flush=True)
+    run([uv, "pip", "install", "--python", str(python), "-r", str(requirements)], cwd=project_root)
+
+
 def ensure_node_environment(project_root: Path) -> None:
     if not (project_root / "package-lock.json").is_file():
         return
@@ -305,6 +371,7 @@ def apply_setup(project_root: Path, install_system: bool, download_model: bool) 
     if install_system:
         ensure_system_dependencies()
     ensure_python_environment(project_root)
+    ensure_cuda_runtime(project_root)
     ensure_node_environment(project_root)
     if install_system:
         ensure_python3_shim()
@@ -336,6 +403,15 @@ def summarize(state: dict[str, Any], applied: bool) -> None:
     else:
         py_status = ".venv あり / 必須パッケージ充足"
     lines.append("  Python環境       : " + py_status)
+
+    gpu = state["gpu"]
+    if gpu["nvidia_detected"]:
+        gpu_status = "NVIDIA検出 / CUDAランタイム " + (
+            "導入済み(GPU高速化有効)" if gpu["cuda_runtime_installed"] else "未導入(--apply で自動導入)"
+        )
+    else:
+        gpu_status = "NVIDIA未検出 (CPU動作。AMD GPUはfaster-whisper非対応)"
+    lines.append("  GPU              : " + gpu_status)
 
     lines.append("  音声認識モデル   : " + ("キャッシュ済み" if state["whisper_model"]["cached"] else "未取得"))
     lines.append("  python3エイリアス: " + ("有効" if state["python3_alias"] else "未設定(新しいシェルで反映)"))

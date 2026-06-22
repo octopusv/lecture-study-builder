@@ -5,14 +5,20 @@ macOS版 scripts/transcribe_macro.py（mlx_whisper）のローカル代替。出
 JSONスキーマを transcribe_macro.py に完全一致させ、後段（build_detailed_notes.py
 や validate_course.py）を無改造で通す。Apple Silicon Mac では transcribe_macro.py
 を使うこと。本スクリプトはWindows以外では実行できない（OSガードで停止）。
+
+`--device auto`（既定）では搭載GPUを自動判定する。NVIDIA + CUDAランタイムが揃って
+いればGPU(CUDA/float16)で実行し、揃っていなければCPUへ安全にフォールバックする。
+AMD GPUは faster-whisper(CTranslate2) が非対応のためCPUで実行し、その旨を通知する。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import re
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -76,6 +82,117 @@ def write_outputs(output_dir: Path, stem: str, payload: dict) -> None:
     (output_dir / f"{stem}.tsv").write_text("\n".join(tsv_lines), encoding="utf-8")
 
 
+CUDA_RUNTIME_HINT = (
+    "NVIDIA GPUを検出しましたが、CUDAランタイム(cuBLAS/cuDNN)を読み込めませんでした。\n"
+    "  次を実行してから再試行するとGPUで動きます（.venv へ導入）:\n"
+    "    .venv\\Scripts\\python -m pip install -r requirements-windows-cuda.txt\n"
+    "  導入済みでもダメな場合は、NVIDIAドライバの更新も確認してください。"
+)
+
+
+def has_nvidia_gpu() -> bool:
+    """CUDAドライバ経由でNVIDIA GPUの有無を見る（cuBLAS/cuDNN無しでもTrueになり得る）。"""
+    try:
+        import ctranslate2  # faster-whisper の依存に含まれる
+
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return False
+
+
+def has_amd_gpu() -> bool:
+    """Windowsの表示アダプタ名にAMD/Radeonが含まれるかを見る（高速化可否の通知用）。"""
+    if platform.system() != "Windows":
+        return False
+    try:
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "(Get-CimInstance Win32_VideoController).Name",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except Exception:
+        return False
+    names = (result.stdout or "").upper()
+    return "AMD" in names or "RADEON" in names
+
+
+def register_cuda_dll_dirs() -> None:
+    """pip導入の nvidia-cublas-cu12 / nvidia-cudnn-cu12 のDLLをWindowsで探索可能にする。
+
+    CTranslate2 はWindowsでこれらのDLLを自動探索しないため、site-packages 配下の
+    bin ディレクトリを os.add_dll_directory で登録する。これが無いと cuBLAS/cuDNN を
+    pip導入しても読み込めず、結局CPUへ落ちてしまう。
+    """
+    if platform.system() != "Windows" or not hasattr(os, "add_dll_directory"):
+        return
+    import site
+
+    roots: list[str] = []
+    roots.extend(site.getsitepackages() if hasattr(site, "getsitepackages") else [])
+    user_site = site.getusersitepackages()
+    if isinstance(user_site, str):
+        roots.append(user_site)
+    for root in roots:
+        for parts in (("nvidia", "cublas", "bin"), ("nvidia", "cudnn", "bin")):
+            dll_dir = Path(root, *parts)
+            if dll_dir.is_dir():
+                try:
+                    os.add_dll_directory(str(dll_dir))
+                except OSError:
+                    pass
+
+
+def resolve_device(device: str, compute_type: str) -> tuple[str, str]:
+    """`auto` を実機のGPU状況へ解決し、compute_type も device に合わせて既定値を決める。"""
+    if device == "auto":
+        if has_nvidia_gpu():
+            device = "cuda"
+            print("GPU検出: NVIDIA (CUDA) を使用します。", flush=True)
+        elif has_amd_gpu():
+            device = "cpu"
+            print(
+                "GPU検出: AMD Radeon。faster-whisper(CTranslate2)はAMD GPUへ非対応のため"
+                "CPUで実行します。AMDでのGPU高速化が必要なら whisper.cpp(Vulkan) 版の導入を"
+                "検討してください。",
+                flush=True,
+            )
+        else:
+            device = "cpu"
+            print("GPU未検出: CPUで実行します。", flush=True)
+    if compute_type == "auto":
+        compute_type = "float16" if device == "cuda" else "int8"
+    return device, compute_type
+
+
+def load_model(model_name: str, device: str, compute_type: str):
+    """モデルを読み込む。CUDA初期化に失敗したらCPUへフォールバックして続行する。
+
+    戻り値は (model, 実際に使ったdevice, 実際に使ったcompute_type)。
+    """
+    # OSガードを通った後に重い依存を読み込む（Macにはインストールされていない）。
+    from faster_whisper import WhisperModel
+
+    if device == "cuda":
+        register_cuda_dll_dirs()
+    try:
+        model = WhisperModel(model_name, device=device, compute_type=compute_type)
+        return model, device, compute_type
+    except Exception as exc:
+        if device != "cuda":
+            raise
+        print(f"CUDA初期化に失敗しました: {exc}", file=sys.stderr, flush=True)
+        print(CUDA_RUNTIME_HINT, file=sys.stderr, flush=True)
+        print("CPU(int8)へフォールバックして続行します。", flush=True)
+        model = WhisperModel(model_name, device="cpu", compute_type="int8")
+        return model, "cpu", "int8"
+
+
 def main() -> int:
     require_windows()
 
@@ -92,12 +209,17 @@ def main() -> int:
     )
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--prompt", default=DEFAULT_PROMPT)
-    parser.add_argument("--device", default="auto", help="auto / cpu / cuda")
-    parser.add_argument("--compute-type", default="auto", help="auto / int8 / float16 など")
+    parser.add_argument(
+        "--device",
+        default="auto",
+        help="auto(GPU自動判定) / cpu / cuda。autoはNVIDIA+CUDAがあればcuda、無ければcpu",
+    )
+    parser.add_argument(
+        "--compute-type",
+        default="auto",
+        help="auto / int8 / float16 など。autoはcudaでfloat16、cpuでint8",
+    )
     args = parser.parse_args()
-
-    # OSガードを通った後に重い依存を読み込む（Macにはインストールされていない）。
-    from faster_whisper import WhisperModel
 
     args.output.mkdir(parents=True, exist_ok=True)
     videos = sorted(args.videos.glob("*.mp4"), key=natural_key)
@@ -114,12 +236,13 @@ def main() -> int:
         print(f"All {len(videos)} videos already transcribed.", flush=True)
         return 0
 
+    device, compute_type = resolve_device(args.device, args.compute_type)
     print(
-        f"Loading model {args.model} (device={args.device}, "
-        f"compute_type={args.compute_type})...",
+        f"Loading model {args.model} (device={device}, compute_type={compute_type})...",
         flush=True,
     )
-    model = WhisperModel(args.model, device=args.device, compute_type=args.compute_type)
+    model, device, compute_type = load_model(args.model, device, compute_type)
+    print(f"Model ready on device={device} (compute_type={compute_type}).", flush=True)
 
     failures: list[str] = []
     for index, video in enumerate(videos, start=1):

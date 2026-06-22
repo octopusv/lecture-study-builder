@@ -1,0 +1,10 @@
+# Windows + NVIDIA GPU でのみ追加導入するCUDAランタイム（cuBLAS / cuDNN）。
+# faster-whisper(CTranslate2) は NVIDIA CUDA でのみGPU高速化できる。これらが無いと
+# GPUがあってもCPUにフォールバックする。AMD/CPUのみの環境では入れる必要はない。
+#
+# 導入（.venv へ）:
+#   .venv\Scripts\python -m pip install -r requirements-windows-cuda.txt
+#
+# CTranslate2 4.x は CUDA 12 / cuDNN 9 系を必要とする。
+nvidia-cublas-cu12>=12.3,<13
+nvidia-cudnn-cu12>=9.1,<10
