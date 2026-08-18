@@ -13,6 +13,7 @@ from mlx_whisper.writers import get_writer
 
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
+TEMPERATURE_FALLBACK = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
 DEFAULT_PROMPT = (
     "マクロ経済学、経済統計、国民経済計算、GDP、GNI、SNA、税制、財政、"
     "金融、物価、雇用、国際収支、経済発展についての大学講義です。"
@@ -41,6 +42,14 @@ def main() -> int:
     )
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--prompt", default=DEFAULT_PROMPT)
+    parser.add_argument(
+        "--condition-on-previous-text",
+        action="store_true",
+        help=(
+            "直前の認識結果を次チャンクのプロンプトに渡す。"
+            "無音の多い講義では繰り返し幻聴が伝播するため既定は無効。"
+        ),
+    )
     args = parser.parse_args()
 
     args.output.mkdir(parents=True, exist_ok=True)
@@ -62,8 +71,14 @@ def main() -> int:
                 language="ja",
                 task="transcribe",
                 verbose=False,
-                temperature=0.0,
-                condition_on_previous_text=True,
+                # 単一温度だと復号が繰り返しループへ落ちたとき抜け出せず、
+                # 講義1本まるごとが幻聴（「ご視聴ありがとうございました。」等）
+                # で埋まる。閾値超過時に温度を上げて再試行させる。
+                temperature=TEMPERATURE_FALLBACK,
+                compression_ratio_threshold=2.4,
+                logprob_threshold=-1.0,
+                no_speech_threshold=0.6,
+                condition_on_previous_text=args.condition_on_previous_text,
                 initial_prompt=args.prompt,
                 word_timestamps=False,
             )

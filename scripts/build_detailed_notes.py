@@ -95,6 +95,30 @@ def topic_title(text: str) -> str:
     return first_meaningful_line(text)
 
 
+def collapse_repeated_segments(
+    segments: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Drop empty segments and runs of the same line.
+
+    Whisper emits long runs of one identical phrase over silence (break time,
+    intro/outro music). Keeping only the first of each consecutive run removes
+    that filler without touching genuinely repeated wording that is separated
+    by other speech.
+    """
+
+    kept: list[dict[str, Any]] = []
+    previous = None
+    for segment in segments:
+        text = re.sub(r"\s+", "", str(segment.get("text", "")))
+        if not text:
+            continue
+        if text == previous:
+            continue
+        previous = text
+        kept.append(segment)
+    return kept
+
+
 def segment_text(segments: list[dict[str, Any]], start: float, end: float) -> str:
     selected = [
         str(segment.get("text", "")).strip()
@@ -111,12 +135,14 @@ def write_video_section(
     transcript: dict[str, Any],
     slides: list[dict[str, Any]],
 ) -> None:
-    segments = sorted(
-        transcript.get("segments", []),
-        key=lambda segment: (
-            float(segment.get("start", 0)),
-            float(segment.get("end", 0)),
-        ),
+    segments = collapse_repeated_segments(
+        sorted(
+            transcript.get("segments", []),
+            key=lambda segment: (
+                float(segment.get("start", 0)),
+                float(segment.get("end", 0)),
+            ),
+        )
     )
     duration = max(
         (float(segment.get("end", 0)) for segment in segments),
