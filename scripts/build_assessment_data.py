@@ -78,6 +78,13 @@ def main() -> int:
         help="任意。{'eras':[{label,lectures,blurb}], 'lectureEra':{'1':label,...}} 形式。"
         "指定すると各回に era、トップレベルに eras を付与する（経済言説史の時代フィルタ用）。",
     )
+    parser.add_argument(
+        "--lecture-meta",
+        type=Path,
+        help="任意。{'groups':[{label,blurb}], 'meta':{...}, 'lectures':{'1':{任意のキー}}} 形式。"
+        "各回へ lectures 側のキー（guest、role、group など）を、トップレベルへ groups と "
+        "meta の追加項目（subtitle、overview など）を付与する。",
+    )
     args = parser.parse_args()
 
     eras_meta = []
@@ -86,6 +93,15 @@ def main() -> int:
         ej = json.loads(args.eras_json.read_text(encoding="utf-8"))
         eras_meta = ej.get("eras", [])
         lecture_era = {str(k): v for k, v in ej.get("lectureEra", {}).items()}
+
+    groups_meta = []
+    lecture_extra = {}
+    meta_extra = {}
+    if args.lecture_meta and args.lecture_meta.exists():
+        lm = json.loads(args.lecture_meta.read_text(encoding="utf-8"))
+        groups_meta = lm.get("groups", [])
+        meta_extra = lm.get("meta", {})
+        lecture_extra = {str(k): v for k, v in lm.get("lectures", {}).items()}
 
     files = sorted(
         args.src.glob("第*.json"),
@@ -169,6 +185,8 @@ def main() -> int:
         era = lecture_era.get(str(lid)) or d.get("era")
         if era:
             lecture["era"] = era
+        for key, value in (lecture_extra.get(str(lid)) or {}).items():
+            lecture[key] = value
         lectures.append(lecture)
         total_q += len(clean_q)
         total_c += len(clean_c)
@@ -183,6 +201,9 @@ def main() -> int:
     }
     if eras_meta:
         data["eras"] = eras_meta
+    if groups_meta:
+        data["groups"] = groups_meta
+    data["meta"].update(meta_extra)
     args.site.mkdir(parents=True, exist_ok=True)
     (args.site / "data.js").write_text(
         "window.EXAM_DATA = " + json.dumps(data, ensure_ascii=False, indent=1) + ";\n",

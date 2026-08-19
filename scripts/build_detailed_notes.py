@@ -119,14 +119,35 @@ def collapse_repeated_segments(
     return kept
 
 
-def segment_text(segments: list[dict[str, Any]], start: float, end: float) -> str:
-    selected = [
-        str(segment.get("text", "")).strip()
-        for segment in segments
-        if float(segment.get("start", 0)) >= start
-        and float(segment.get("start", 0)) < end
-    ]
-    return "\n\n".join(text for text in selected if text)
+def segment_text(
+    segments: list[dict[str, Any]],
+    start: float,
+    end: float,
+    marker_interval: float = 120.0,
+) -> str:
+    """1スライド区間の文字起こしを、時刻の目印付きで返す。
+
+    スライドが数十分に一度しか変わらない対談形式の講義では、節見出しの時刻
+    だけでは根拠の位置を特定できない。一定時間ごとに実在する区間開始時刻を
+    `**[MM:SS]**` として差し込み、作問・監査が検証可能な時刻を引用できる
+    ようにする。
+    """
+
+    parts: list[str] = []
+    last_bucket = -1
+    for segment in segments:
+        seg_start = float(segment.get("start", 0))
+        if seg_start < start or seg_start >= end:
+            continue
+        text = str(segment.get("text", "")).strip()
+        if not text:
+            continue
+        bucket = int((seg_start - start) // marker_interval)
+        if bucket != last_bucket:
+            last_bucket = bucket
+            parts.append(f"**[{format_time(seg_start)}]**")
+        parts.append(text)
+    return "\n\n".join(parts)
 
 
 def write_video_section(
